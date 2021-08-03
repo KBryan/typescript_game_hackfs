@@ -4,7 +4,7 @@ namespace ShadowySuperCoder {
         private _ready:boolean = false;
         // Preload
         public preload() {
-
+            this.load.image("Block","assets/Block.png");
         }
         public create() {
 

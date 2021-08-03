@@ -43,6 +43,188 @@ var ShadowySuperCoder;
     }(Phaser.Game));
     ShadowySuperCoder.Game = Game;
 })(ShadowySuperCoder || (ShadowySuperCoder = {}));
+var ShadowySuperCoder;
+(function (ShadowySuperCoder) {
+    var MainLayer = /** @class */ (function (_super) {
+        __extends(MainLayer, _super);
+        // -------------------------------------------------------------------------
+        function MainLayer(game, parent) {
+            var _this = _super.call(this, game, parent) || this;
+            _this._lastTile = new Phaser.Point(0, 0);
+            // piece generated with generator
+            _this._piece = null;
+            // platforms generator
+            _this._generator = new Generator.Generator(game.rnd);
+            // pool of walls
+            _this._wallsPool = new Helper.Pool(Phaser.Sprite, 32, function () {
+                // add empty sprite with body
+                var sprite = new Phaser.Sprite(game, 0, 0, "Block");
+                game.physics.enable(sprite, Phaser.Physics.ARCADE);
+                var body = sprite.body;
+                body.allowGravity = false;
+                body.immovable = true;
+                body.moves = false;
+                body.setSize(64, 64, 0, 0);
+                return sprite;
+            });
+            // walls group
+            _this._walls = new Phaser.Group(game, _this);
+            // set initial tile for generating
+            _this._piece = _this._generator.setPiece(0, 5, 10);
+            _this._state = 0 /* PROCESS_PIECE */;
+            return _this;
+        }
+        // -------------------------------------------------------------------------
+        MainLayer.prototype.render = function () {
+            this._walls.forEachExists(function (sprite) {
+                this.game.debug.body(sprite);
+            }, this);
+        };
+        // -------------------------------------------------------------------------
+        MainLayer.prototype.generate = function (leftTile) {
+            // remove tiles too far to left
+            this.cleanTiles(leftTile);
+            // width of screen rounded to whole tiles up
+            var width = Math.ceil(this.game.width / Generator.Parameters.CELL_SIZE);
+            // generate platforms until we generate platform that ends out of the screen on right
+            while (this._lastTile.x < leftTile + width) {
+                switch (this._state) {
+                    case 0 /* PROCESS_PIECE */:
+                        {
+                            this._lastTile.copyFrom(this._piece.position);
+                            var length_1 = this._piece.length;
+                            // process piece
+                            while (length_1 > 0) {
+                                this.addBlock(this._lastTile.x, this._lastTile.y);
+                                if ((--length_1) > 0) {
+                                    ++this._lastTile.x;
+                                }
+                            }
+                            // return processed piece into pool
+                            this._generator.destroyPiece(this._piece);
+                            // generate next platform
+                            this._state = 1 /* GENERATE_PIECE */;
+                            break;
+                        }
+                    case 1 /* GENERATE_PIECE */:
+                        {
+                            this._piece = this._generator.generate(this._lastTile);
+                            this._state = 0 /* PROCESS_PIECE */;
+                            break;
+                        }
+                }
+            }
+        };
+        // -------------------------------------------------------------------------
+        MainLayer.prototype.cleanTiles = function (leftTile) {
+            leftTile *= Generator.Parameters.CELL_SIZE;
+            for (var i = this._walls.length - 1; i >= 0; i--) {
+                var wall = this._walls.getChildAt(i);
+                if (wall.x - leftTile <= -64) {
+                    this._walls.remove(wall);
+                    wall.parent = null;
+                    this._wallsPool.destroyItem(wall);
+                }
+            }
+        };
+        // -------------------------------------------------------------------------
+        MainLayer.prototype.addBlock = function (x, y) {
+            // sprite  get from pool
+            var sprite = this._wallsPool.createItem();
+            sprite.position.set(x * 64, y * 64);
+            sprite.exists = true;
+            sprite.visible = true;
+            // add into walls group
+            if (sprite.parent === null) {
+                this._walls.add(sprite);
+            }
+        };
+        Object.defineProperty(MainLayer.prototype, "walls", {
+            // -------------------------------------------------------------------------
+            get: function () {
+                return this._walls;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        return MainLayer;
+    }(Phaser.Group));
+    ShadowySuperCoder.MainLayer = MainLayer;
+})(ShadowySuperCoder || (ShadowySuperCoder = {}));
+var Generator;
+(function (Generator_1) {
+    var Generator = /** @class */ (function () {
+        //
+        function Generator(rnd) {
+            this._lastGeneratedPiece = null;
+            // random number generator
+            this._rnd = rnd;
+            // reference to jump tables
+            this._jumpTables = Generator_1.JumpTables.instance;
+            // pool pieces
+            this._piecesPool = new Helper.Pool(Generator_1.Piece, 16);
+        }
+        Generator.prototype.createPiece = function () {
+            var piece = this._piecesPool.createItem();
+            if (piece === null) {
+                console.error("No free pieces in pool");
+            }
+            return piece;
+        };
+        Generator.prototype.destroyPiece = function (piece) {
+            this._piecesPool.destroyItem(piece);
+        };
+        Generator.prototype.setPiece = function (x, y, length, offsetX, offsetY) {
+            if (offsetX === void 0) { offsetX = 0; }
+            if (offsetY === void 0) { offsetY = 0; }
+            var piece = this.createPiece();
+            piece.position.set(x, y);
+            piece.offset.set(offsetX, offsetY);
+            piece.length = length;
+            return piece;
+        };
+        Generator.prototype.generate = function (lastPosition) {
+            var piece = this.createPiece();
+            var ubound = Generator_1.Parameters.UBOUND;
+            var lbound = Generator_1.Parameters.LBOUND;
+            // Y Position
+            // how high can jump max
+            var minY = this._jumpTables.maxOffsetY();
+            // fall max
+            var maxY = lbound - ubound;
+            // clear last y from upper bound force to start from 0
+            var currentY = lastPosition.y - ubound;
+            // new randomness y position - each y level on screen has the same probability
+            var shiftY = this._rnd.integerInRange(0, lbound - ubound);
+            // substract currentY from shiftY split y levels to negative (step up -) (step down +)
+            shiftY -= currentY;
+            // clamp step
+            shiftY = Phaser.Math.clamp(shiftY, minY, maxY);
+            // new level for platform
+            var newY = Phaser.Math.clamp(currentY + shiftY, 0, lbound - ubound);
+            // shift by upper bound to get right y
+            piece.position.y = newY + ubound;
+            // shift by upper bound to get right y on screen
+            piece.offset.y = piece.position.y - lastPosition.y;
+            // X POSITION
+            var minX = this._jumpTables.minOffsetX(newY - currentY);
+            var maxX = this._jumpTables.maxOffsetX(newY - currentY);
+            // position of next tile in x direction
+            var shiftX = this._rnd.integerInRange(minX, maxX);
+            // new absolute x position
+            piece.position.x = lastPosition.x + shiftX;
+            // offset of new piece relative to last positon
+            piece.offset.x = shiftX;
+            // length
+            piece.length = this._rnd.integerInRange(3, 5);
+            // returned result
+            this._lastGeneratedPiece = piece;
+            return piece;
+        };
+        return Generator;
+    }());
+    Generator_1.Generator = Generator;
+})(Generator || (Generator = {}));
 var Generator;
 (function (Generator) {
     var Jump = /** @class */ (function () {
@@ -338,6 +520,9 @@ var Generator;
     var Parameters = /** @class */ (function () {
         function Parameters() {
         }
+        // bound for generating platforms
+        Parameters.UBOUND = 2;
+        Parameters.LBOUND = 8;
         // game area
         Parameters.GRID_HEIGHT = 10;
         Parameters.CELL_SIZE = 64;
@@ -357,6 +542,82 @@ var Generator;
     }());
     Generator.Parameters = Parameters;
 })(Generator || (Generator = {}));
+var Generator;
+(function (Generator) {
+    var Piece = /** @class */ (function () {
+        function Piece() {
+            // absolute position of left cell
+            this.position = new Phaser.Point(0, 0);
+            // calculate the offset
+            this.offset = new Phaser.Point(0, 0);
+        }
+        return Piece;
+    }());
+    Generator.Piece = Piece;
+})(Generator || (Generator = {}));
+var Helper;
+(function (Helper) {
+    var Pool = /** @class */ (function () {
+        // -------------------------------------------------------------------------
+        function Pool(classType, count, newFunction) {
+            if (newFunction === void 0) { newFunction = null; }
+            this._newFunction = null;
+            this._count = 0;
+            this._pool = [];
+            this._canGrow = true;
+            this._poolSize = 0;
+            this._classType = classType;
+            this._newFunction = newFunction;
+            for (var i = 0; i < count; i++) {
+                // create new item
+                var item = this.newItem();
+                // store into stack of free items
+                this._pool[this._count++] = item;
+            }
+        }
+        // -------------------------------------------------------------------------
+        Pool.prototype.createItem = function () {
+            if (this._count === 0) {
+                return this._canGrow ? this.newItem() : null;
+            }
+            else {
+                return this._pool[--this._count];
+            }
+        };
+        // -------------------------------------------------------------------------
+        Pool.prototype.destroyItem = function (item) {
+            this._pool[this._count++] = item;
+        };
+        // -------------------------------------------------------------------------
+        Pool.prototype.newItem = function () {
+            ++this._poolSize;
+            if (this._newFunction !== null) {
+                return this._newFunction();
+            }
+            else {
+                return new this._classType;
+            }
+        };
+        Object.defineProperty(Pool.prototype, "newFunction", {
+            // -------------------------------------------------------------------------
+            set: function (newFunction) {
+                this._newFunction = newFunction;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(Pool.prototype, "canGrow", {
+            // -------------------------------------------------------------------------
+            set: function (canGrow) {
+                this._canGrow = canGrow;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        return Pool;
+    }());
+    Helper.Pool = Pool;
+})(Helper || (Helper = {}));
 var ShadowySuperCoder;
 (function (ShadowySuperCoder) {
     var Boot = /** @class */ (function (_super) {
@@ -378,13 +639,21 @@ var ShadowySuperCoder;
         function Play() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
+        // render to the screen
+        Play.prototype.render = function () {
+            this._mainLayer.render();
+        };
         Play.prototype.create = function () {
-            this.stage.backgroundColor = 0x80FF80;
+            this.stage.backgroundColor = 0xC0C0C0;
+            this.camera.bounds = null;
             Generator.JumpTables.setDebug(true, ShadowySuperCoder.Global);
             Generator.JumpTables.instance;
             this.game.add.sprite(0, 0, Generator.JumpTables.debugBitmapData);
+            this._mainLayer = new ShadowySuperCoder.MainLayer(this.game, this.world);
         };
         Play.prototype.update = function () {
+            this.camera.x += this.time.physicsElapsed * Generator.Parameters.VELOCITY_X / 2;
+            this._mainLayer.generate(this.camera.x / Generator.Parameters.CELL_SIZE);
         };
         return Play;
     }(Phaser.State));
@@ -402,6 +671,7 @@ var ShadowySuperCoder;
         }
         // Preload
         Preload.prototype.preload = function () {
+            this.load.image("Block", "assets/Block.png");
         };
         Preload.prototype.create = function () {
         };

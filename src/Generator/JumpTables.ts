@@ -322,7 +322,6 @@ namespace Generator {
                 // add columns header numbers
                 bmd.text("" + (i / Parameters.CELL_SIZE), i + 20, 20, "24px Courier", "#FFFF00");
             }
-
             JumpTables._debugBmd = bmd;
         }
     }

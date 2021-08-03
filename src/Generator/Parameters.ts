@@ -1,5 +1,8 @@
 namespace Generator {
     export class Parameters {
+        // bound for generating platforms
+        public static UBOUND = 2;
+        public static LBOUND = 8;
         // game area
         public static GRID_HEIGHT = 10;
         public static CELL_SIZE = 64;
