@@ -1,2 +1,2 @@
-# typescript_game_hackfs
-Game submission for HackFS
+# Shadowy Super Coder The Game
+Repo for HACKFS
