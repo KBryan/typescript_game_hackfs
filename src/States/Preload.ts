@@ -5,6 +5,7 @@ namespace ShadowySuperCoder {
         // Preload
         public preload() {
             this.load.image("Block","assets/Block.png");
+            this.load.image("Player","assets/Player.png");
         }
         public create() {
 

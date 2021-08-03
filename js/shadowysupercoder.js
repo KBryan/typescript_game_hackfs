@@ -151,6 +151,25 @@ var ShadowySuperCoder;
     }(Phaser.Group));
     ShadowySuperCoder.MainLayer = MainLayer;
 })(ShadowySuperCoder || (ShadowySuperCoder = {}));
+var ShadowySuperCoder;
+(function (ShadowySuperCoder) {
+    var Player = /** @class */ (function (_super) {
+        __extends(Player, _super);
+        function Player(game) {
+            var _this = _super.call(this, game, 0, 0, "Player") || this;
+            // center player
+            _this.anchor.x = 0.5;
+            // enable physics
+            game.physics.arcade.enable(_this, false);
+            // allow gravity
+            var body = _this.body;
+            body.allowGravity = true;
+            return _this;
+        }
+        return Player;
+    }(Phaser.Sprite));
+    ShadowySuperCoder.Player = Player;
+})(ShadowySuperCoder || (ShadowySuperCoder = {}));
 var Generator;
 (function (Generator_1) {
     var Generator = /** @class */ (function () {
@@ -637,23 +656,101 @@ var ShadowySuperCoder;
     var Play = /** @class */ (function (_super) {
         __extends(Play, _super);
         function Play() {
-            return _super !== null && _super.apply(this, arguments) || this;
+            var _this = _super !== null && _super.apply(this, arguments) || this;
+            _this._jumpTimer = 0;
+            // status
+            _this._gameOver = false;
+            _this._justDown = false;
+            _this._justUp = false;
+            return _this;
         }
-        // render to the screen
+        // -------------------------------------------------------------------------
         Play.prototype.render = function () {
             this._mainLayer.render();
         };
+        // -------------------------------------------------------------------------
         Play.prototype.create = function () {
             this.stage.backgroundColor = 0xC0C0C0;
+            // camera
             this.camera.bounds = null;
-            Generator.JumpTables.setDebug(true, ShadowySuperCoder.Global);
+            // physics
+            this.physics.arcade.gravity.y = Generator.Parameters.GRAVITY;
+            //Generator.JumpTables.setDebug(true, GoblinRun.Global);
             Generator.JumpTables.instance;
-            this.game.add.sprite(0, 0, Generator.JumpTables.debugBitmapData);
+            // this.game.add.sprite(0, 0, Generator.JumpTables.debugBitmapData);
             this._mainLayer = new ShadowySuperCoder.MainLayer(this.game, this.world);
+            // set player
+            this._player = new ShadowySuperCoder.Player(this.game);
+            this._player.position.set(96, 64 * 1);
+            this.world.add(this._player);
+            // input
+            // key
+            this._jumpKey = this.game.input.keyboard.addKey(Phaser.KeyCode.SPACEBAR);
+            // mouse
+            this.game.input.onDown.add(function () {
+                this._justDown = true;
+            }, this);
+            this.game.input.onUp.add(function () {
+                this._justUp = true;
+            }, this);
         };
+        // -------------------------------------------------------------------------
         Play.prototype.update = function () {
-            this.camera.x += this.time.physicsElapsed * Generator.Parameters.VELOCITY_X / 2;
-            this._mainLayer.generate(this.camera.x / Generator.Parameters.CELL_SIZE);
+            if (!this._gameOver) {
+                this.updatePhysics();
+                // move camera
+                this.camera.x = this._player.x - 96;
+                // generate level
+                this._mainLayer.generate(this.camera.x / Generator.Parameters.CELL_SIZE);
+                // check if player is still on screen
+                if (this._player.y > this.game.height) {
+                    console.log("GAME OVER");
+                    this._gameOver = true;
+                }
+            }
+        };
+        // -------------------------------------------------------------------------
+        Play.prototype.updatePhysics = function () {
+            var body = this._player.body;
+            // collision with walls
+            var wallCollision = this.physics.arcade.collide(this._player, this._mainLayer.walls);
+            // move
+            if (wallCollision && body.touching.right) {
+                body.velocity.set(0, 0);
+                this._gameOver = true;
+                console.log("GAME OVER");
+                return;
+            }
+            // set body velocity
+            body.velocity.x = Generator.Parameters.VELOCITY_X;
+            // read keyboard
+            if (this._jumpKey.justDown) {
+                this._justDown = true;
+            }
+            if (this._jumpKey.justUp) {
+                this._justUp = true;
+            }
+            var jumpTable = Generator.JumpTables.instance;
+            // start jump
+            if (this._justDown && body.touching.down && this.game.time.now > this._jumpTimer) {
+                body.velocity.y = jumpTable.maxJumpVelocity;
+                this._jumpTimer = this.game.time.now + 150;
+                this._justDown = false;
+            }
+            // stop jump
+            if (this._justUp && body.velocity.y < jumpTable.minJumpVelocity) {
+                body.velocity.y = jumpTable.minJumpVelocity;
+            }
+            // if down pressed, but player is going up, then clear it
+            if (body.velocity.y <= 0) {
+                this._justDown = false;
+            }
+            // if key is released then clear down press
+            if (this._justUp) {
+                this._justDown = false;
+            }
+            // just up was processed - clear it
+            this._justUp = false;
         };
         return Play;
     }(Phaser.State));
@@ -672,6 +769,7 @@ var ShadowySuperCoder;
         // Preload
         Preload.prototype.preload = function () {
             this.load.image("Block", "assets/Block.png");
+            this.load.image("Player", "assets/Player.png");
         };
         Preload.prototype.create = function () {
         };
