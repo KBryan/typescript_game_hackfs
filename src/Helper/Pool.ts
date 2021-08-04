@@ -1,4 +1,10 @@
 namespace Helper {
+    /**
+     * // TODO: comment Helper
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     export class Pool<T> {
         private _classType:any;
         private _newFunction:Function = null;

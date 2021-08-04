@@ -1,5 +1,11 @@
 namespace Generator {
 
+    /**
+     * // TODO: comment JumpTables
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     export class JumpTables {
 
         private static _instance = null;
@@ -244,7 +250,6 @@ namespace Generator {
             }
         }
 
-        // -------------------------------------------------------------------------
         public maxOffsetY(jumpIndex: number = -1): number {
             if (jumpIndex === -1) {
                 return this._jumpOffsetYMax;
@@ -253,7 +258,6 @@ namespace Generator {
             }
         }
 
-        // -------------------------------------------------------------------------
         public maxOffsetX(offsetY: number): number {
             let maxX = this._jumpOffsetXMaxs[offsetY];
 
@@ -265,7 +269,6 @@ namespace Generator {
             return maxX;
         }
 
-        // -------------------------------------------------------------------------
         public minOffsetX(offsetY: number): number {
             let minX = this._jumpOffsetXMins[offsetY];
 
@@ -284,7 +287,6 @@ namespace Generator {
         private static _globals: any;
         private static _debugBmd: Phaser.BitmapData;
 
-        // -------------------------------------------------------------------------
         public static setDebug(debug: boolean, gameGlobals?: any): void {
             JumpTables._DEBUG = debug;
             JumpTables._globals = gameGlobals;
@@ -299,12 +301,10 @@ namespace Generator {
             }
         }
 
-        // -------------------------------------------------------------------------
         public static get debugBitmapData(): Phaser.BitmapData {
             return JumpTables._debugBmd;
         }
 
-        // -------------------------------------------------------------------------
         private static createDebugBitmap(): void {
             let global = JumpTables._globals;
 

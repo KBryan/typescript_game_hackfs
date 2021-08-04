@@ -1,5 +1,12 @@
 namespace ShadowySuperCoder {
 
+    /**
+     * // TODO: comment eGenerateState
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
+
     const enum eGenerateState { PROCESS_PIECE, GENERATE_PIECE }
 
     export class MainLayer extends Phaser.Group {
@@ -13,7 +20,9 @@ namespace ShadowySuperCoder {
         private _state: eGenerateState;
 
         // piece generated with generator
-        private _piece: Generator.Piece = null;
+        // private _piece: Generator.Piece = null;
+
+        private _difficulty: Generator.Difficulty;
 
         // -------------------------------------------------------------------------
         public render(): void {
@@ -28,6 +37,9 @@ namespace ShadowySuperCoder {
 
             // platforms generator
             this._generator = new Generator.Generator(game.rnd);
+
+            // object that holds level difficulty progress
+            this._difficulty = new Generator.Difficulty(game.rnd);
 
             // pool of walls
             this._wallsPool = new Helper.Pool<Phaser.Sprite>(Phaser.Sprite, 32, function () {
@@ -48,7 +60,8 @@ namespace ShadowySuperCoder {
             this._walls = new Phaser.Group(game, this);
 
             // set initial tile for generating
-            this._piece = this._generator.setPiece(0, 5, 10);
+            // this._piece = this._generator.setPiece(0, 5, 10);
+            this._generator.setPiece(0, 5, 10);
             this._state = eGenerateState.PROCESS_PIECE;
         }
 
@@ -67,8 +80,15 @@ namespace ShadowySuperCoder {
 
                     case eGenerateState.PROCESS_PIECE:
                     {
-                        this._lastTile.copyFrom(this._piece.position);
-                        let length = this._piece.length;
+                        // check if queue not empty - should never happen
+                        if (!this._generator.hasPieces) {
+                            console.error("Pieces queue is empty!");
+                        }
+
+                        let piece = this._generator.getPieceFromQueue();
+
+                        this._lastTile.copyFrom(piece.position);
+                        let length = piece.length;
 
                         // process piece
                         while (length > 0) {
@@ -80,10 +100,12 @@ namespace ShadowySuperCoder {
                         }
 
                         // return processed piece into pool
-                        this._generator.destroyPiece(this._piece);
+                        this._generator.destroyPiece(piece);
 
                         // generate next platform
-                        this._state = eGenerateState.GENERATE_PIECE;
+                        if (!this._generator.hasPieces) {
+                            this._state = eGenerateState.GENERATE_PIECE;
+                        }
 
                         break;
                     }
@@ -91,8 +113,12 @@ namespace ShadowySuperCoder {
 
                     case eGenerateState.GENERATE_PIECE:
                     {
-                        this._piece = this._generator.generate(this._lastTile);
+                        this._difficulty.update(leftTile);
+
+                        this._generator.generatePieces(this._lastTile, this._difficulty);
+
                         this._state = eGenerateState.PROCESS_PIECE;
+
                         break;
                     }
                 }

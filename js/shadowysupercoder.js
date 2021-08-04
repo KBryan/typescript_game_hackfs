@@ -51,10 +51,10 @@ var ShadowySuperCoder;
         function MainLayer(game, parent) {
             var _this = _super.call(this, game, parent) || this;
             _this._lastTile = new Phaser.Point(0, 0);
-            // piece generated with generator
-            _this._piece = null;
             // platforms generator
             _this._generator = new Generator.Generator(game.rnd);
+            // object that holds level difficulty progress
+            _this._difficulty = new Generator.Difficulty(game.rnd);
             // pool of walls
             _this._wallsPool = new Helper.Pool(Phaser.Sprite, 32, function () {
                 // add empty sprite with body
@@ -70,7 +70,8 @@ var ShadowySuperCoder;
             // walls group
             _this._walls = new Phaser.Group(game, _this);
             // set initial tile for generating
-            _this._piece = _this._generator.setPiece(0, 5, 10);
+            // this._piece = this._generator.setPiece(0, 5, 10);
+            _this._generator.setPiece(0, 5, 10);
             _this._state = 0 /* PROCESS_PIECE */;
             return _this;
         }
@@ -91,8 +92,13 @@ var ShadowySuperCoder;
                 switch (this._state) {
                     case 0 /* PROCESS_PIECE */:
                         {
-                            this._lastTile.copyFrom(this._piece.position);
-                            var length_1 = this._piece.length;
+                            // check if queue not empty - should never happen
+                            if (!this._generator.hasPieces) {
+                                console.error("Pieces queue is empty!");
+                            }
+                            var piece = this._generator.getPieceFromQueue();
+                            this._lastTile.copyFrom(piece.position);
+                            var length_1 = piece.length;
                             // process piece
                             while (length_1 > 0) {
                                 this.addBlock(this._lastTile.x, this._lastTile.y);
@@ -101,14 +107,17 @@ var ShadowySuperCoder;
                                 }
                             }
                             // return processed piece into pool
-                            this._generator.destroyPiece(this._piece);
+                            this._generator.destroyPiece(piece);
                             // generate next platform
-                            this._state = 1 /* GENERATE_PIECE */;
+                            if (!this._generator.hasPieces) {
+                                this._state = 1 /* GENERATE_PIECE */;
+                            }
                             break;
                         }
                     case 1 /* GENERATE_PIECE */:
                         {
-                            this._piece = this._generator.generate(this._lastTile);
+                            this._difficulty.update(leftTile);
+                            this._generator.generatePieces(this._lastTile, this._difficulty);
                             this._state = 0 /* PROCESS_PIECE */;
                             break;
                         }
@@ -171,18 +180,72 @@ var ShadowySuperCoder;
     ShadowySuperCoder.Player = Player;
 })(ShadowySuperCoder || (ShadowySuperCoder = {}));
 var Generator;
+(function (Generator) {
+    var Difficulty = /** @class */ (function () {
+        // -------------------------------------------------------------------------
+        function Difficulty(rnd) {
+            this._rnd = rnd;
+            // maximum length of platform
+            this._platformLengthDecrease = Generator.Parameters.PLATFORM_LENGTH_DECREASER_MIN;
+            // jump width decreaser to make jumps easier in game beginnig
+            this._jumpLengthDecrease = Generator.Parameters.JUMP_LENGTH_DECREASER_MIN;
+        }
+        Object.defineProperty(Difficulty.prototype, "platformLengthDecrease", {
+            // -------------------------------------------------------------------------
+            get: function () {
+                return this._platformLengthDecrease;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(Difficulty.prototype, "jumpLengthDecrease", {
+            // -------------------------------------------------------------------------
+            get: function () {
+                return this._jumpLengthDecrease;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        // -------------------------------------------------------------------------
+        Difficulty.prototype.mapLinear = function (x, a1, a2, b1, b2) {
+            x = Phaser.Math.clamp(x, a1, a2);
+            return Phaser.Math.mapLinear(x, a1, a2, b1, b2);
+        };
+        // -------------------------------------------------------------------------
+        Difficulty.prototype.update = function (tileX) {
+            // platform length
+            this._platformLengthDecrease = Math.round(this.mapLinear(tileX, Generator.Parameters.PLATFORM_LENGTH_DECREASER_START_TITLE, Generator.Parameters.PLATFORM_LENGTH_DECREASER_END_TITLE, Generator.Parameters.PLATFORM_LENGTH_DECREASER_MIN, Generator.Parameters.PLATFORM_LENGTH_DECREASER_MAX));
+            // jump length
+            this._jumpLengthDecrease = Math.round(this.mapLinear(tileX, Generator.Parameters.JUMP_LENGTH_DECREASER_MAX_START_TITLE, Generator.Parameters.JUMP_LENGTH_DECREASER_END_TITLE, Generator.Parameters.JUMP_LENGTH_DECREASER_MIN, Generator.Parameters.JUMP_LENGTH_DECREASER_MAX));
+        };
+        // -------------------------------------------------------------------------
+        Difficulty.prototype.toString = function () {
+            return "platformLengthDecrease: " + this._platformLengthDecrease +
+                ", jumpLengthDecrease: " + this.jumpLengthDecrease;
+        };
+        return Difficulty;
+    }());
+    Generator.Difficulty = Difficulty;
+})(Generator || (Generator = {}));
+var Generator;
 (function (Generator_1) {
+    var UNDEFINED = -10000;
     var Generator = /** @class */ (function () {
-        //
+        // -------------------------------------------------------------------------
         function Generator(rnd) {
             this._lastGeneratedPiece = null;
-            // random number generator
+            // pieces queue
+            this._piecesQueue = [];
+            this._piecesQueueTop = 0;
+            this._hlpPoint = new Phaser.Point();
+            // random numbers generator
             this._rnd = rnd;
             // reference to jump tables
             this._jumpTables = Generator_1.JumpTables.instance;
-            // pool pieces
+            // pool of pieces
             this._piecesPool = new Helper.Pool(Generator_1.Piece, 16);
         }
+        // -------------------------------------------------------------------------
         Generator.prototype.createPiece = function () {
             var piece = this._piecesPool.createItem();
             if (piece === null) {
@@ -190,9 +253,40 @@ var Generator;
             }
             return piece;
         };
+        // -------------------------------------------------------------------------
         Generator.prototype.destroyPiece = function (piece) {
             this._piecesPool.destroyItem(piece);
         };
+        Object.defineProperty(Generator.prototype, "hasPieces", {
+            // -------------------------------------------------------------------------
+            get: function () {
+                return this._piecesQueueTop > 0;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        // -------------------------------------------------------------------------
+        Generator.prototype.addPieceIntoQueue = function (piece) {
+            // put new piece into queue and increase its length
+            this._piecesQueue[this._piecesQueueTop++] = piece;
+        };
+        // -------------------------------------------------------------------------
+        Generator.prototype.getPieceFromQueue = function () {
+            // if no pieces in queue then return null
+            if (this._piecesQueueTop === 0) {
+                return null;
+            }
+            // get first piece in queue
+            var piece = this._piecesQueue[0];
+            // shift remaining pieces left by 1
+            for (var i = 0; i < this._piecesQueueTop - 1; i++) {
+                this._piecesQueue[i] = this._piecesQueue[i + 1];
+            }
+            // clear last slot in queue and decrease queue top
+            this._piecesQueue[--this._piecesQueueTop] = null;
+            return piece;
+        };
+        // -------------------------------------------------------------------------
         Generator.prototype.setPiece = function (x, y, length, offsetX, offsetY) {
             if (offsetX === void 0) { offsetX = 0; }
             if (offsetY === void 0) { offsetY = 0; }
@@ -200,45 +294,123 @@ var Generator;
             piece.position.set(x, y);
             piece.offset.set(offsetX, offsetY);
             piece.length = length;
+            this.addPieceIntoQueue(piece);
             return piece;
         };
-        Generator.prototype.generate = function (lastPosition) {
+        // -------------------------------------------------------------------------
+        Generator.prototype.generate = function (lastPosition, difficulty, length, offsetX, offsetY, bonusJump) {
             var piece = this.createPiece();
             var ubound = Generator_1.Parameters.UBOUND;
             var lbound = Generator_1.Parameters.LBOUND;
-            // Y Position
+            // Y POSITION
             // how high can jump max
             var minY = this._jumpTables.maxOffsetY();
-            // fall max
-            var maxY = lbound - ubound;
-            // clear last y from upper bound force to start from 0
+            // how deep can fall max
+            // let maxY = lbound - ubound;
+            var maxY = -minY;
+            // clear last y from upper bound, so it starts from 0
             var currentY = lastPosition.y - ubound;
-            // new randomness y position - each y level on screen has the same probability
-            var shiftY = this._rnd.integerInRange(0, lbound - ubound);
-            // substract currentY from shiftY split y levels to negative (step up -) (step down +)
-            shiftY -= currentY;
-            // clamp step
-            shiftY = Phaser.Math.clamp(shiftY, minY, maxY);
+            var shiftY = offsetY;
+            if (shiftY === UNDEFINED) {
+                // new random y position - each y level on screen has the same probability
+                shiftY = this._rnd.integerInRange(0, lbound - ubound);
+                // substract currentY from shiftY - it will split possible y levels to negative
+                // (how much step up (-)) and positive (how much to step down (+))
+                shiftY -= currentY;
+                // clamp step to keep it inside interval given with maximum
+                // jump offset up (minY) and maximum fall down (maxX)
+                shiftY = Phaser.Math.clamp(shiftY, minY, maxY);
+            }
             // new level for platform
+            // limit once more against game limits (2 free tiles on top, 1 water tile at bottom)
             var newY = Phaser.Math.clamp(currentY + shiftY, 0, lbound - ubound);
-            // shift by upper bound to get right y
+            // shift by upper bound to get right y level on screen
             piece.position.y = newY + ubound;
-            // shift by upper bound to get right y on screen
+            // offset of new piece relative to last position (end position of last piece)
             piece.offset.y = piece.position.y - lastPosition.y;
             // X POSITION
-            var minX = this._jumpTables.minOffsetX(newY - currentY);
-            var maxX = this._jumpTables.maxOffsetX(newY - currentY);
-            // position of next tile in x direction
-            var shiftX = this._rnd.integerInRange(minX, maxX);
+            var shiftX = offsetX;
+            // calculate is offsetX is not forced or offsetY was forced, but final value is different
+            if (shiftX === UNDEFINED || (offsetY !== UNDEFINED && offsetY !== piece.offset.y)) {
+                var minX = this._jumpTables.minOffsetX(piece.offset.y);
+                var maxX = this._jumpTables.maxOffsetX(piece.offset.y);
+                // decrease maximum jump distance with jump decreaser in difficulty to
+                // make jumps easier in the beginning of game
+                // But be sure it does not fall under minX
+                maxX = Math.max(minX, maxX + difficulty.jumpLengthDecrease);
+                // position of next tile in x direction
+                shiftX = this._rnd.integerInRange(minX, maxX);
+            }
             // new absolute x position
             piece.position.x = lastPosition.x + shiftX;
-            // offset of new piece relative to last positon
+            // offset of new piece relative to last position (end position of last piece)
             piece.offset.x = shiftX;
-            // length
-            piece.length = this._rnd.integerInRange(3, 5);
-            // returned result
+            // LENGTH
+            if (length !== UNDEFINED) {
+                piece.length = length;
+            }
+            else {
+                // decrease maximum length of platform with difficulty progress
+                piece.length = this._rnd.integerInRange(Generator_1.Parameters.PLATFORM_LENGTH_MIN, Generator_1.Parameters.PLATFORM_LENGTH_MAX + difficulty.platformLengthDecrease);
+            }
+            console.log(difficulty.toString());
+            // RESULT
             this._lastGeneratedPiece = piece;
             return piece;
+        };
+        // -------------------------------------------------------------------------
+        Generator.prototype.generatePieces = function (lastTile, difficulty) {
+            var probability = this._rnd.integerInRange(0, 99);
+            if (probability < Generator_1.Parameters.GENERATE_RANDOM) {
+                this.generateRandomly(lastTile, difficulty);
+            }
+            else {
+                this.generatePattern(lastTile, difficulty);
+            }
+        };
+        // -------------------------------------------------------------------------
+        Generator.prototype.generateRandomly = function (lastTile, difficulty) {
+            var piece = this.generate(lastTile, difficulty, UNDEFINED, UNDEFINED, UNDEFINED, false);
+            // add to queue
+            this.addPieceIntoQueue(piece);
+        };
+        // -------------------------------------------------------------------------
+        Generator.prototype.generatePattern = function (lastTile, difficulty) {
+            // save index of first new piece
+            var oldQueueTop = this._piecesQueueTop;
+            // where to start generating
+            var hlpPos = this._hlpPoint;
+            hlpPos.copyFrom(lastTile);
+            // same length for all pices?
+            var length = UNDEFINED;
+            if (this._rnd.integerInRange(0, 99) < Generator_1.Parameters.KEEP_LENGTH_IN_PATTERN) {
+                length = this._rnd.integerInRange(Generator_1.Parameters.PLATFORM_LENGTH_MIN, Generator_1.Parameters.PLATFORM_LENGTH_MAX + difficulty.platformLengthDecrease);
+            }
+            // how many pieces to repeat in pattern
+            var basePices = 2;
+            for (var i = 0; i < basePices; i++) {
+                var piece = this.generate(hlpPos, difficulty, length, UNDEFINED, UNDEFINED, false);
+                hlpPos.copyFrom(piece.position);
+                // get last tile of piece
+                hlpPos.x += piece.length - 1;
+                // add to queue
+                this.addPieceIntoQueue(piece);
+            }
+            // repeat pattern X times
+            var repeat = 1;
+            for (var i = 0; i < repeat; i++) {
+                // repeat all pieces in pattern
+                for (var p = 0; p < basePices; p++) {
+                    // get first piece in pattern to repeat as template
+                    var templetePiece = this._piecesQueue[oldQueueTop + p];
+                    // replicate it
+                    var piece = this.generate(hlpPos, difficulty, length, templetePiece.offset.x, templetePiece.offset.y, false);
+                    hlpPos.copyFrom(piece.position);
+                    hlpPos.x += piece.length - 1;
+                    // add to stack
+                    this.addPieceIntoQueue(piece);
+                }
+            }
         };
         return Generator;
     }());
@@ -458,7 +630,6 @@ var Generator;
                 }
             }
         };
-        // -------------------------------------------------------------------------
         JumpTables.prototype.maxOffsetY = function (jumpIndex) {
             if (jumpIndex === void 0) { jumpIndex = -1; }
             if (jumpIndex === -1) {
@@ -468,7 +639,6 @@ var Generator;
                 return this._jumpOffsetsY[jumpIndex];
             }
         };
-        // -------------------------------------------------------------------------
         JumpTables.prototype.maxOffsetX = function (offsetY) {
             var maxX = this._jumpOffsetXMaxs[offsetY];
             if (typeof maxX === "undefined") {
@@ -477,7 +647,6 @@ var Generator;
             }
             return maxX;
         };
-        // -------------------------------------------------------------------------
         JumpTables.prototype.minOffsetX = function (offsetY) {
             var minX = this._jumpOffsetXMins[offsetY];
             if (typeof minX === "undefined") {
@@ -486,7 +655,6 @@ var Generator;
             }
             return minX;
         };
-        // -------------------------------------------------------------------------
         JumpTables.setDebug = function (debug, gameGlobals) {
             JumpTables._DEBUG = debug;
             JumpTables._globals = gameGlobals;
@@ -501,14 +669,12 @@ var Generator;
             }
         };
         Object.defineProperty(JumpTables, "debugBitmapData", {
-            // -------------------------------------------------------------------------
             get: function () {
                 return JumpTables._debugBmd;
             },
             enumerable: false,
             configurable: true
         });
-        // -------------------------------------------------------------------------
         JumpTables.createDebugBitmap = function () {
             var global = JumpTables._globals;
             var bmd = new Phaser.BitmapData(global.game, "Grid", global.GAME_WIDTH, global.GAME_HEIGHT);
@@ -557,6 +723,22 @@ var Generator;
         Parameters.HEIGHT_STEPS = 4;
         // horizontal speed
         Parameters.VELOCITY_X = 300;
+        // difficulty
+        Parameters.PLATFORM_LENGTH_MIN = 2;
+        Parameters.PLATFORM_LENGTH_MAX = 5;
+        Parameters.PLATFORM_LENGTH_DECREASER_MIN = 0;
+        Parameters.PLATFORM_LENGTH_DECREASER_MAX = -2;
+        Parameters.PLATFORM_LENGTH_DECREASER_START_TITLE = 100;
+        Parameters.PLATFORM_LENGTH_DECREASER_END_TITLE = 200;
+        // jump length
+        Parameters.JUMP_LENGTH_DECREASER_MIN = -1;
+        Parameters.JUMP_LENGTH_DECREASER_MAX = 0;
+        Parameters.JUMP_LENGTH_DECREASER_MAX_START_TITLE = 0;
+        Parameters.JUMP_LENGTH_DECREASER_END_TITLE = 50;
+        // probability to generate random piece in percent
+        Parameters.GENERATE_RANDOM = 50;
+        // keep length of all platforms in pattern the same? (in percent)
+        Parameters.KEEP_LENGTH_IN_PATTERN = 75;
         return Parameters;
     }());
     Generator.Parameters = Parameters;
