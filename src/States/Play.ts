@@ -32,7 +32,7 @@ namespace ShadowySuperCoder {
             this.physics.arcade.gravity.y = Generator.Parameters.GRAVITY;
 
 
-            //Generator.JumpTables.setDebug(true, GoblinRun.Global);
+            //Generator.JumpTables.setDebug(true, ShadowySuperCoder.Global);
             Generator.JumpTables.instance;
 
             // this.game.add.sprite(0, 0, Generator.JumpTables.debugBitmapData);
