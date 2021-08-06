@@ -8,6 +8,10 @@ namespace Generator {
     const UNDEFINED = -10000;
 
     export class Generator {
+        // signale
+        // dispatch new piece, previous piece
+        public onRandomPlatform:Phaser.Signal = new Phaser.Signal();
+        public onPatternPlatform:Phaser.Signal = new Phaser.Signal();
 
         private _rnd: Phaser.RandomDataGenerator;
         private _jumpTables: JumpTables;
@@ -194,10 +198,13 @@ namespace Generator {
 
         // -------------------------------------------------------------------------
         private generateRandomly(lastTile: Phaser.Point, difficulty: Difficulty): void {
+            let prevPiece = this._lastGeneratedPiece;
             let piece = this.generate(lastTile, difficulty, UNDEFINED, UNDEFINED, UNDEFINED, false);
 
             // add to queue
             this.addPieceIntoQueue(piece);
+            // dispatch signal - let listener know if random platform has been generated
+            this.onRandomPlatform.dispatch(piece,prevPiece);
         }
 
         // -------------------------------------------------------------------------
@@ -221,6 +228,7 @@ namespace Generator {
             let basePices = 2;
 
             for (let i = 0; i < basePices; i++) {
+                let prevPiece = this._lastGeneratedPiece;
                 let piece = this.generate(hlpPos, difficulty, length, UNDEFINED, UNDEFINED, false);
 
                 hlpPos.copyFrom(piece.position);
@@ -229,6 +237,9 @@ namespace Generator {
 
                 // add to queue
                 this.addPieceIntoQueue(piece);
+                // dispatch signal - let listeners know, pattern platform has been generated
+                // pass: new piece, previous piece
+                this.onPatternPlatform.dispatch(piece,prevPiece,i,0,null);
             }
 
 
@@ -236,7 +247,7 @@ namespace Generator {
             let repeat = 1;
 
             for (let i = 0; i < repeat; i++) {
-
+                let prevPiece = this._lastGeneratedPiece;
                 // repeat all pieces in pattern
                 for (let p = 0; p < basePices; p++) {
                     // get first piece in pattern to repeat as template
@@ -251,6 +262,8 @@ namespace Generator {
 
                     // add to stack
                     this.addPieceIntoQueue(piece);
+                    // dispatch signal - let listneners know, pattern platform has been generated
+                    this.onPatternPlatform.dispatch(piece,prevPiece,p,i + 1, templetePiece);
                 }
             }
         }

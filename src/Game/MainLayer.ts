@@ -6,8 +6,14 @@ namespace ShadowySuperCoder {
      * @param fileName
      * @returns script version
      */
-
     const enum eGenerateState { PROCESS_PIECE, GENERATE_PIECE }
+
+    const enum eTileType { LEFT, MIDDLE, RIGHT }
+
+    interface IGamePiece extends Generator.Piece {
+        isPlatform: boolean;
+    }
+
 
     export class MainLayer extends Phaser.Group {
 
@@ -37,6 +43,8 @@ namespace ShadowySuperCoder {
 
             // platforms generator
             this._generator = new Generator.Generator(game.rnd);
+            this._generator.onRandomPlatform.add(this.onRandomPlatform, this);
+            this._generator.onPatternPlatform.add(this.onPatternPlatform, this);
 
             // object that holds level difficulty progress
             this._difficulty = new Generator.Difficulty(game.rnd);
@@ -44,7 +52,7 @@ namespace ShadowySuperCoder {
             // pool of walls
             this._wallsPool = new Helper.Pool<Phaser.Sprite>(Phaser.Sprite, 32, function () {
                 // add empty sprite with body
-                let sprite = new Phaser.Sprite(game, 0, 0, "Block");
+                let sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
                 game.physics.enable(sprite, Phaser.Physics.ARCADE);
 
                 let body = <Phaser.Physics.Arcade.Body>sprite.body;
@@ -89,14 +97,17 @@ namespace ShadowySuperCoder {
 
                         this._lastTile.copyFrom(piece.position);
                         let length = piece.length;
+                        let tileType = eTileType.LEFT;
 
                         // process piece
                         while (length > 0) {
-                            this.addBlock(this._lastTile.x, this._lastTile.y);
+                            this.addTiles(this._lastTile.x, this._lastTile.y, tileType, (<IGamePiece>piece).isPlatform);
 
                             if ((--length) > 0) {
                                 ++this._lastTile.x;
                             }
+
+                            tileType = (length === 1) ? eTileType.RIGHT : eTileType.MIDDLE;
                         }
 
                         // return processed piece into pool
@@ -141,23 +152,98 @@ namespace ShadowySuperCoder {
         }
 
         // -------------------------------------------------------------------------
-        private addBlock(x: number, y: number): void {
-            // sprite  get from pool
-            let sprite = this._wallsPool.createItem();
-            sprite.position.set(x * 64, y * 64);
+        private addTiles(x: number, y: number, type: eTileType, platform: boolean): void {
 
-            sprite.exists = true;
-            sprite.visible = true;
+            let defs: ITileDef[][];
 
-            // add into walls group
-            if (sprite.parent === null) {
-                this._walls.add(sprite);
+            // find right defs
+            if (platform) {
+                defs = BlockDefs.PLATFORM;
+            } else if (y === Generator.Parameters.LBOUND) {
+                defs = BlockDefs.LOW_BLOCK;
+            } else {
+                defs = BlockDefs.BLOCK;
+            }
+
+
+            // number of vertical tiles
+            let rowsCount = platform ? 1 : Generator.Parameters.LBOUND - y + 1;
+
+            for (let r = y; r < y + rowsCount; r++) {
+
+                // find correct block definition
+                let blockDef: ITileDef;
+                if (defs !== BlockDefs.BLOCK) {
+                    blockDef = defs[0][type];
+                } else {
+                    if (r === y) {
+                        blockDef = defs[0][type];
+                    } else if (r < y + rowsCount - 1) {
+                        blockDef = defs[1][type];
+                    } else {
+                        blockDef = defs[2][type];
+                    }
+                }
+
+                // sprite  get from pool
+                let sprite = this._wallsPool.createItem();
+                sprite.position.set(x * 64, r * 64);
+
+                sprite.exists = true;
+                sprite.visible = true;
+
+                // adjust sprite to match block definition
+                sprite.frameName = blockDef.name;
+                sprite.anchor.set(blockDef.anchorX, blockDef.anchorY);
+                let body = <Phaser.Physics.Arcade.Body>sprite.body;
+                body.setSize(blockDef.bodyWidth, blockDef.bodyHeight, blockDef.bodyOffsetX, blockDef.bodyOffsetY);
+
+                // add into walls group
+                if (sprite.parent === null) {
+                    this._walls.add(sprite);
+                }
             }
         }
 
         // -------------------------------------------------------------------------
         public get walls(): Phaser.Group {
             return this._walls;
+        }
+
+        // -------------------------------------------------------------------------
+        public onRandomPlatform(piece: IGamePiece, previous: IGamePiece): void {
+            this.setPlatform(piece);
+        }
+
+        // -------------------------------------------------------------------------
+        public onPatternPlatform(piece: IGamePiece, previous: IGamePiece,
+                                 position: number, repeat: number, template: IGamePiece): void {
+
+            // first platform in pattern?
+            if (position === 0 && repeat === 0) {
+                this.setPlatform(piece);
+            } else if (repeat === 0) {  // still in base pieces?
+                // randomly decide on whether to follow previous piece setting
+                if (this.game.rnd.integerInRange(0, 99) < 50) {
+                    piece.isPlatform = previous.isPlatform;
+                } else {
+                    this.setPlatform(piece);
+                }
+            } else {
+                // high probability to follow base pices settings
+                if (this.game.rnd.integerInRange(0, 99) < 90) {
+                    piece.isPlatform = template.isPlatform;
+                } else {
+                    this.setPlatform(piece);
+                }
+            }
+        }
+
+        // -------------------------------------------------------------------------
+        private setPlatform(piece: IGamePiece): void {
+            // draw as block or platform?
+            let platformProb = 100 - (piece.position.y - Generator.Parameters.UBOUND) * 20;
+            piece.isPlatform = this.game.rnd.integerInRange(0, 99) < platformProb;
         }
     }
 }

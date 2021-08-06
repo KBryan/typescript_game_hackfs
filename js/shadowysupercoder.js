@@ -45,6 +45,42 @@ var ShadowySuperCoder;
 })(ShadowySuperCoder || (ShadowySuperCoder = {}));
 var ShadowySuperCoder;
 (function (ShadowySuperCoder) {
+    var BlockDefs = /** @class */ (function () {
+        function BlockDefs() {
+        }
+        BlockDefs.PLATFORM = [[
+                { name: "PlatformLeft", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 48 },
+                { name: "PlatformMiddle", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 48 },
+                { name: "PlatformRight", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 48 }
+            ]];
+        BlockDefs.BLOCK = [
+            [
+                { name: "BlockTopLeft", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 64 },
+                { name: "BlockTopMiddle", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 64 },
+                { name: "BlockTopRight", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 64 }
+            ], [
+                { name: "BlockMiddleLeft", anchorX: 0, anchorY: 0, bodyOffsetX: 0, bodyOffsetY: 0, bodyWidth: 64, bodyHeight: 64 },
+                { name: "BlockMiddleMiddle", anchorX: 0, anchorY: 0, bodyOffsetX: 0, bodyOffsetY: 0, bodyWidth: 64, bodyHeight: 64 },
+                { name: "BlockMiddleRight", anchorX: 0, anchorY: 0, bodyOffsetX: 0, bodyOffsetY: 0, bodyWidth: 64, bodyHeight: 64 }
+            ], [
+                { name: "BlockBottomLeft", anchorX: 0, anchorY: 0, bodyOffsetX: 0, bodyOffsetY: 0, bodyWidth: 64, bodyHeight: 64 },
+                { name: "BlockBottomMiddle", anchorX: 0, anchorY: 0, bodyOffsetX: 0, bodyOffsetY: 0, bodyWidth: 64, bodyHeight: 64 },
+                { name: "BlockBottomRight", anchorX: 0, anchorY: 0, bodyOffsetX: 0, bodyOffsetY: 0, bodyWidth: 64, bodyHeight: 64 }
+            ]
+        ];
+        BlockDefs.LOW_BLOCK = [
+            [
+                { name: "LowBlockLeft", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 64 },
+                { name: "LowBlockMiddle", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 64 },
+                { name: "LowBlockRight", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 64 }
+            ]
+        ];
+        return BlockDefs;
+    }());
+    ShadowySuperCoder.BlockDefs = BlockDefs;
+})(ShadowySuperCoder || (ShadowySuperCoder = {}));
+var ShadowySuperCoder;
+(function (ShadowySuperCoder) {
     var MainLayer = /** @class */ (function (_super) {
         __extends(MainLayer, _super);
         // -------------------------------------------------------------------------
@@ -53,12 +89,14 @@ var ShadowySuperCoder;
             _this._lastTile = new Phaser.Point(0, 0);
             // platforms generator
             _this._generator = new Generator.Generator(game.rnd);
+            _this._generator.onRandomPlatform.add(_this.onRandomPlatform, _this);
+            _this._generator.onPatternPlatform.add(_this.onPatternPlatform, _this);
             // object that holds level difficulty progress
             _this._difficulty = new Generator.Difficulty(game.rnd);
             // pool of walls
             _this._wallsPool = new Helper.Pool(Phaser.Sprite, 32, function () {
                 // add empty sprite with body
-                var sprite = new Phaser.Sprite(game, 0, 0, "Block");
+                var sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
                 game.physics.enable(sprite, Phaser.Physics.ARCADE);
                 var body = sprite.body;
                 body.allowGravity = false;
@@ -99,12 +137,14 @@ var ShadowySuperCoder;
                             var piece = this._generator.getPieceFromQueue();
                             this._lastTile.copyFrom(piece.position);
                             var length_1 = piece.length;
+                            var tileType = 0 /* LEFT */;
                             // process piece
                             while (length_1 > 0) {
-                                this.addBlock(this._lastTile.x, this._lastTile.y);
+                                this.addTiles(this._lastTile.x, this._lastTile.y, tileType, piece.isPlatform);
                                 if ((--length_1) > 0) {
                                     ++this._lastTile.x;
                                 }
+                                tileType = (length_1 === 1) ? 2 /* RIGHT */ : 1 /* MIDDLE */;
                             }
                             // return processed piece into pool
                             this._generator.destroyPiece(piece);
@@ -137,15 +177,51 @@ var ShadowySuperCoder;
             }
         };
         // -------------------------------------------------------------------------
-        MainLayer.prototype.addBlock = function (x, y) {
-            // sprite  get from pool
-            var sprite = this._wallsPool.createItem();
-            sprite.position.set(x * 64, y * 64);
-            sprite.exists = true;
-            sprite.visible = true;
-            // add into walls group
-            if (sprite.parent === null) {
-                this._walls.add(sprite);
+        MainLayer.prototype.addTiles = function (x, y, type, platform) {
+            var defs;
+            // find right defs
+            if (platform) {
+                defs = ShadowySuperCoder.BlockDefs.PLATFORM;
+            }
+            else if (y === Generator.Parameters.LBOUND) {
+                defs = ShadowySuperCoder.BlockDefs.LOW_BLOCK;
+            }
+            else {
+                defs = ShadowySuperCoder.BlockDefs.BLOCK;
+            }
+            // number of vertical tiles
+            var rowsCount = platform ? 1 : Generator.Parameters.LBOUND - y + 1;
+            for (var r = y; r < y + rowsCount; r++) {
+                // find correct block definition
+                var blockDef = void 0;
+                if (defs !== ShadowySuperCoder.BlockDefs.BLOCK) {
+                    blockDef = defs[0][type];
+                }
+                else {
+                    if (r === y) {
+                        blockDef = defs[0][type];
+                    }
+                    else if (r < y + rowsCount - 1) {
+                        blockDef = defs[1][type];
+                    }
+                    else {
+                        blockDef = defs[2][type];
+                    }
+                }
+                // sprite  get from pool
+                var sprite = this._wallsPool.createItem();
+                sprite.position.set(x * 64, r * 64);
+                sprite.exists = true;
+                sprite.visible = true;
+                // adjust sprite to match block definition
+                sprite.frameName = blockDef.name;
+                sprite.anchor.set(blockDef.anchorX, blockDef.anchorY);
+                var body = sprite.body;
+                body.setSize(blockDef.bodyWidth, blockDef.bodyHeight, blockDef.bodyOffsetX, blockDef.bodyOffsetY);
+                // add into walls group
+                if (sprite.parent === null) {
+                    this._walls.add(sprite);
+                }
             }
         };
         Object.defineProperty(MainLayer.prototype, "walls", {
@@ -156,12 +232,53 @@ var ShadowySuperCoder;
             enumerable: false,
             configurable: true
         });
+        // -------------------------------------------------------------------------
+        MainLayer.prototype.onRandomPlatform = function (piece, previous) {
+            this.setPlatform(piece);
+        };
+        // -------------------------------------------------------------------------
+        MainLayer.prototype.onPatternPlatform = function (piece, previous, position, repeat, template) {
+            // first platform in pattern?
+            if (position === 0 && repeat === 0) {
+                this.setPlatform(piece);
+            }
+            else if (repeat === 0) { // still in base pieces?
+                // randomly decide on whether to follow previous piece setting
+                if (this.game.rnd.integerInRange(0, 99) < 50) {
+                    piece.isPlatform = previous.isPlatform;
+                }
+                else {
+                    this.setPlatform(piece);
+                }
+            }
+            else {
+                // high probability to follow base pices settings
+                if (this.game.rnd.integerInRange(0, 99) < 90) {
+                    piece.isPlatform = template.isPlatform;
+                }
+                else {
+                    this.setPlatform(piece);
+                }
+            }
+        };
+        // -------------------------------------------------------------------------
+        MainLayer.prototype.setPlatform = function (piece) {
+            // draw as block or platform?
+            var platformProb = 100 - (piece.position.y - Generator.Parameters.UBOUND) * 20;
+            piece.isPlatform = this.game.rnd.integerInRange(0, 99) < platformProb;
+        };
         return MainLayer;
     }(Phaser.Group));
     ShadowySuperCoder.MainLayer = MainLayer;
 })(ShadowySuperCoder || (ShadowySuperCoder = {}));
 var ShadowySuperCoder;
 (function (ShadowySuperCoder) {
+    /**
+     * // TODO: comment Player
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     var Player = /** @class */ (function (_super) {
         __extends(Player, _super);
         function Player(game) {
@@ -182,6 +299,12 @@ var ShadowySuperCoder;
 var Generator;
 (function (Generator) {
     var Difficulty = /** @class */ (function () {
+        /**
+         * // TODO: comment Difficulty
+         * Gets script version
+         * @param fileName
+         * @returns script version
+         */
         // -------------------------------------------------------------------------
         function Difficulty(rnd) {
             this._rnd = rnd;
@@ -229,10 +352,25 @@ var Generator;
 })(Generator || (Generator = {}));
 var Generator;
 (function (Generator_1) {
+    /**
+     * // TODO: comment Generator
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     var UNDEFINED = -10000;
     var Generator = /** @class */ (function () {
-        // -------------------------------------------------------------------------
+        /**
+         * // TODO: comment Generator
+         * Gets script version
+         * @param fileName
+         * @returns script version
+         */
         function Generator(rnd) {
+            // signale
+            // dispatch new piece, previous piece
+            this.onRandomPlatform = new Phaser.Signal();
+            this.onPatternPlatform = new Phaser.Signal();
             this._lastGeneratedPiece = null;
             // pieces queue
             this._piecesQueue = [];
@@ -370,9 +508,12 @@ var Generator;
         };
         // -------------------------------------------------------------------------
         Generator.prototype.generateRandomly = function (lastTile, difficulty) {
+            var prevPiece = this._lastGeneratedPiece;
             var piece = this.generate(lastTile, difficulty, UNDEFINED, UNDEFINED, UNDEFINED, false);
             // add to queue
             this.addPieceIntoQueue(piece);
+            // dispatch signal - let listener know if random platform has been generated
+            this.onRandomPlatform.dispatch(piece, prevPiece);
         };
         // -------------------------------------------------------------------------
         Generator.prototype.generatePattern = function (lastTile, difficulty) {
@@ -389,16 +530,21 @@ var Generator;
             // how many pieces to repeat in pattern
             var basePices = 2;
             for (var i = 0; i < basePices; i++) {
+                var prevPiece = this._lastGeneratedPiece;
                 var piece = this.generate(hlpPos, difficulty, length, UNDEFINED, UNDEFINED, false);
                 hlpPos.copyFrom(piece.position);
                 // get last tile of piece
                 hlpPos.x += piece.length - 1;
                 // add to queue
                 this.addPieceIntoQueue(piece);
+                // dispatch signal - let listeners know, pattern platform has been generated
+                // pass: new piece, previous piece
+                this.onPatternPlatform.dispatch(piece, prevPiece, i, 0, null);
             }
             // repeat pattern X times
             var repeat = 1;
             for (var i = 0; i < repeat; i++) {
+                var prevPiece = this._lastGeneratedPiece;
                 // repeat all pieces in pattern
                 for (var p = 0; p < basePices; p++) {
                     // get first piece in pattern to repeat as template
@@ -409,6 +555,8 @@ var Generator;
                     hlpPos.x += piece.length - 1;
                     // add to stack
                     this.addPieceIntoQueue(piece);
+                    // dispatch signal - let listneners know, pattern platform has been generated
+                    this.onPatternPlatform.dispatch(piece, prevPiece, p, i + 1, templetePiece);
                 }
             }
         };
@@ -418,6 +566,12 @@ var Generator;
 })(Generator || (Generator = {}));
 var Generator;
 (function (Generator) {
+    /**
+     * // TODO: comment Generator
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     var Jump = /** @class */ (function () {
         function Jump() {
             this.offsetY = 0;
@@ -432,6 +586,12 @@ var Generator;
 })(Generator || (Generator = {}));
 var Generator;
 (function (Generator) {
+    /**
+     * // TODO: comment JumpTables
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     var JumpTables = /** @class */ (function () {
         // -------------------------------------------------------------------------
         function JumpTables() {
@@ -702,6 +862,12 @@ var Generator;
 })(Generator || (Generator = {}));
 var Generator;
 (function (Generator) {
+    /**
+     * // TODO: comment Parameters
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     var Parameters = /** @class */ (function () {
         function Parameters() {
         }
@@ -758,6 +924,12 @@ var Generator;
 })(Generator || (Generator = {}));
 var Helper;
 (function (Helper) {
+    /**
+     * // TODO: comment Helper
+     * Gets script version
+     * @param fileName
+     * @returns script version
+     */
     var Pool = /** @class */ (function () {
         // -------------------------------------------------------------------------
         function Pool(classType, count, newFunction) {
@@ -857,7 +1029,7 @@ var ShadowySuperCoder;
             this.camera.bounds = null;
             // physics
             this.physics.arcade.gravity.y = Generator.Parameters.GRAVITY;
-            //Generator.JumpTables.setDebug(true, GoblinRun.Global);
+            //Generator.JumpTables.setDebug(true, ShadowySuperCoder.Global);
             Generator.JumpTables.instance;
             // this.game.add.sprite(0, 0, Generator.JumpTables.debugBitmapData);
             this._mainLayer = new ShadowySuperCoder.MainLayer(this.game, this.world);
@@ -952,6 +1124,7 @@ var ShadowySuperCoder;
         Preload.prototype.preload = function () {
             this.load.image("Block", "assets/Block.png");
             this.load.image("Player", "assets/Player.png");
+            this.load.atlas("Sprites", "assets/Sprite.png", "atlas/Sprites.json");
         };
         Preload.prototype.create = function () {
         };
