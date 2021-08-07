@@ -4,6 +4,7 @@
     "target": "es5",
     "noImplicitAny": false,
     "sourceMap": true,
+    "lib": ["es6", "es7", "dom", "scripthost"],
     "outFile": "js/shadowysupercoder.js"
   },
   "exclude": [

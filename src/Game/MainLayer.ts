@@ -52,7 +52,9 @@ namespace ShadowySuperCoder {
             // pool of walls
             this._wallsPool = new Helper.Pool<Phaser.Sprite>(Phaser.Sprite, 32, function () {
                 // add empty sprite with body
-                let sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
+                //let sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
+                let sprite = new Phaser.Sprite(game, 0, 0, "Block");
+
                 game.physics.enable(sprite, Phaser.Physics.ARCADE);
 
                 let body = <Phaser.Physics.Arcade.Body>sprite.body;
