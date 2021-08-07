@@ -1124,7 +1124,7 @@ var ShadowySuperCoder;
         Preload.prototype.preload = function () {
             this.load.image("Block", "assets/Block.png");
             this.load.image("Player", "assets/Player.png");
-            this.load.atlas("Sprites", "assets/Sprite.png", "atlas/Sprites.json");
+            this.load.atlas("Sprites", "assets/Sprite.png", "atlas/Sprite.json");
         };
         Preload.prototype.create = function () {
         };
