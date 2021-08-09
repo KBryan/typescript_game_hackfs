@@ -99,7 +99,7 @@ var ShadowySuperCoder;
             _this._wallsPool = new Helper.Pool(Phaser.Sprite, 32, function () {
                 // add empty sprite with body
                 //let sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
-                var sprite = new Phaser.Sprite(game, 0, 0, "Block");
+                var sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
                 game.physics.enable(sprite, Phaser.Physics.ARCADE);
                 var body = sprite.body;
                 body.allowGravity = false;
@@ -293,6 +293,13 @@ var ShadowySuperCoder;
             // allow gravity
             var body = _this.body;
             body.allowGravity = true;
+            // set body size according to values in Generator.Parameters
+            var bodyW = Generator.Parameters.PLAYER_BODY_WIDTH;
+            var bodyH = Generator.Parameters.PLAYER_BODY_HEIGHT;
+            var bodyOffsetX = -bodyW / 2 + _this.width * _this.anchor.x;
+            var bodyOffsetY = 0;
+            // set body size and offset
+            body.setSize(bodyW, bodyH, bodyOffsetX, bodyOffsetY);
             return _this;
         }
         return Player;
@@ -1127,7 +1134,9 @@ var ShadowySuperCoder;
         Preload.prototype.preload = function () {
             this.load.image("Block", "assets/Block.png");
             this.load.image("Player", "assets/Player.png");
-            this.load.atlas("Sprites", "assets/Sprite.png", "assets/Sprite.json");
+            this.load.atlas("Sprites", "assets/Sprites.png", "assets/Sprite.json");
+            // spriter anim
+            this.load.xml("ShadowAnim", "assets/Goblin.xml");
         };
         Preload.prototype.create = function () {
         };

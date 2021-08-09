@@ -6,7 +6,9 @@ namespace ShadowySuperCoder {
         public preload() {
             this.load.image("Block","assets/Block.png");
             this.load.image("Player","assets/Player.png");
-            this.load.atlas("Sprites","assets/Sprite.png","assets/Sprite.json");
+            this.load.atlas("Sprites","assets/Sprites.png","assets/Sprite.json");
+            // spriter anim
+            this.load.xml("ShadowAnim","assets/Goblin.xml");
         }
         public create() {
 

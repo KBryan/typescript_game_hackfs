@@ -44,13 +44,17 @@ namespace Generator {
         public update(tileX: number): void {
             // platform length
             this._platformLengthDecrease = Math.round(this.mapLinear(tileX,
-                Parameters.PLATFORM_LENGTH_DECREASER_START_TITLE, Parameters.PLATFORM_LENGTH_DECREASER_END_TITLE,
-                Parameters.PLATFORM_LENGTH_DECREASER_MIN, Parameters.PLATFORM_LENGTH_DECREASER_MAX));
+                Parameters.PLATFORM_LENGTH_DECREASER_START_TITLE,
+                Parameters.PLATFORM_LENGTH_DECREASER_END_TITLE,
+                Parameters.PLATFORM_LENGTH_DECREASER_MIN,
+                Parameters.PLATFORM_LENGTH_DECREASER_MAX));
 
             // jump length
             this._jumpLengthDecrease = Math.round(this.mapLinear(tileX,
-                Parameters.JUMP_LENGTH_DECREASER_MAX_START_TITLE, Parameters.JUMP_LENGTH_DECREASER_END_TITLE,
-                Parameters.JUMP_LENGTH_DECREASER_MIN, Parameters.JUMP_LENGTH_DECREASER_MAX));
+                Parameters.JUMP_LENGTH_DECREASER_MAX_START_TITLE,
+                Parameters.JUMP_LENGTH_DECREASER_END_TITLE,
+                Parameters.JUMP_LENGTH_DECREASER_MIN,
+                Parameters.JUMP_LENGTH_DECREASER_MAX));
         }
 
         // -------------------------------------------------------------------------
