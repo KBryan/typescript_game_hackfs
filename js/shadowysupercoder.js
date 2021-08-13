@@ -47,6 +47,79 @@ var ShadowySuperCoder;
 })(ShadowySuperCoder || (ShadowySuperCoder = {}));
 var ShadowySuperCoder;
 (function (ShadowySuperCoder) {
+    var Background = /** @class */ (function (_super) {
+        __extends(Background, _super);
+        // -------------------------------------------------------------------------
+        function Background(game, parent) {
+            var _this = _super.call(this, game, parent) || this;
+            _this._nextTree = 0;
+            // heights
+            var treesHeight = game.cache.getImage("TreesBg").height;
+            var hillHeight = game.cache.getImage("Hill").height;
+            var mudHeight = game.cache.getImage("Mud").height;
+            // trees bg
+            _this._treesBg = new Phaser.TileSprite(game, 0, 0, game.width, treesHeight, "TreesBg");
+            _this._treesBg.fixedToCamera = true;
+            _this.add(_this._treesBg);
+            // trees group / pool
+            _this._trees = new Phaser.Group(game, _this);
+            _this._trees.createMultiple(4, "Sprites", "Tree", false);
+            // width of tree sprite
+            _this._treeWidth = game.cache.getFrameByName("Sprites", "Tree").width;
+            // hill
+            _this._hill = new Phaser.TileSprite(game, 0, game.height - mudHeight - hillHeight, game.width, hillHeight, "Hill");
+            _this._hill.fixedToCamera = true;
+            _this.add(_this._hill);
+            // mud
+            _this._mud = new Phaser.TileSprite(game, 0, game.height - mudHeight, game.width, mudHeight, "Mud");
+            _this._mud.fixedToCamera = true;
+            _this.add(_this._mud);
+            return _this;
+        }
+        // -------------------------------------------------------------------------
+        Background.prototype.updateLayers = function (x) {
+            // move all three tilesprites
+            this._mud.tilePosition.x = -x + Math.sin(Phaser.Math.degToRad((this.game.time.time / 30) % 360)) * 20;
+            this._hill.tilePosition.x = -x * 0.5;
+            this._treesBg.tilePosition.x = -x * 0.25;
+            // move trees layer and remove/add trees
+            this.manageTrees(x * 0.5);
+        };
+        // -------------------------------------------------------------------------
+        Background.prototype.manageTrees = function (x) {
+            // move trees layer
+            this._trees.x = x;
+            // remove old
+            this._trees.forEachExists(function (tree) {
+                if (tree.x < x - this._treeWidth) {
+                    tree.exists = false;
+                }
+            }, this);
+            // add new tree(s)
+            while (this._nextTree < x + this.game.width) {
+                // save new tree position
+                var treeX = this._nextTree;
+                // calcultate position for next tree
+                this._nextTree += this.game.rnd.integerInRange(Background.TREE_DIST_MIN, Background.TREE_DIST_MAX);
+                // get unused tree sprite
+                var tree = this._trees.getFirstExists(false);
+                // if no free sprites, exit loop
+                if (tree === null) {
+                    break;
+                }
+                // position tree and make it exist
+                tree.x = treeX;
+                tree.exists = true;
+            }
+        };
+        Background.TREE_DIST_MIN = 300;
+        Background.TREE_DIST_MAX = 800;
+        return Background;
+    }(Phaser.Group));
+    ShadowySuperCoder.Background = Background;
+})(ShadowySuperCoder || (ShadowySuperCoder = {}));
+var ShadowySuperCoder;
+(function (ShadowySuperCoder) {
     var BlockDefs = /** @class */ (function () {
         function BlockDefs() {
         }
@@ -99,7 +172,7 @@ var ShadowySuperCoder;
             _this._wallsPool = new Helper.Pool(Phaser.Sprite, 32, function () {
                 // add empty sprite with body
                 //let sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
-                var sprite = new Phaser.Sprite(game, 0, 0, "Sprites");
+                var sprite = new Phaser.Sprite(game, 0, 0, "Block");
                 game.physics.enable(sprite, Phaser.Physics.ARCADE);
                 var body = sprite.body;
                 body.allowGravity = false;
@@ -1034,11 +1107,13 @@ var ShadowySuperCoder;
         };
         // -------------------------------------------------------------------------
         Play.prototype.create = function () {
-            this.stage.backgroundColor = 0xC0C0C0;
+            this.stage.backgroundColor = 0xA0DA6F;
             // camera
             this.camera.bounds = null;
             // physics
             this.physics.arcade.gravity.y = Generator.Parameters.GRAVITY;
+            // background
+            this._bg = new ShadowySuperCoder.Background(this.game, this.world);
             //Generator.JumpTables.setDebug(true, ShadowySuperCoder.Global);
             Generator.JumpTables.instance;
             // this.game.add.sprite(0, 0, Generator.JumpTables.debugBitmapData);
@@ -1062,6 +1137,8 @@ var ShadowySuperCoder;
         Play.prototype.update = function () {
             if (!this._gameOver) {
                 this.updatePhysics();
+                // move background
+                this._bg.updateLayers(this.camera.x);
                 // move camera
                 this.camera.x = this._player.x - 96;
                 // generate level
@@ -1125,8 +1202,8 @@ var ShadowySuperCoder;
     var Preload = /** @class */ (function (_super) {
         __extends(Preload, _super);
         function Preload() {
-            var _this = _super !== null && _super.apply(this, arguments) || this;
             // music decode / ready for game
+            var _this = _super !== null && _super.apply(this, arguments) || this;
             _this._ready = false;
             return _this;
         }
@@ -1136,7 +1213,9 @@ var ShadowySuperCoder;
             this.load.image("Player", "assets/Player.png");
             this.load.atlas("Sprites", "assets/Sprites.png", "assets/Sprite.json");
             // spriter anim
-            this.load.xml("ShadowAnim", "assets/Goblin.xml");
+            this.load.image("Mud", "assets/Mud.png");
+            this.load.image("Hill", "assets/Hill.png");
+            this.load.image("TreesBg", "assets/TreesBg.png");
         };
         Preload.prototype.create = function () {
         };

@@ -15,6 +15,8 @@ namespace ShadowySuperCoder {
         private _jumpKey: Phaser.Key;
         private _justDown: boolean = false;
         private _justUp: boolean = false;
+        // background
+        private _bg:Background;
 
         // -------------------------------------------------------------------------
         public render() {
@@ -23,13 +25,15 @@ namespace ShadowySuperCoder {
 
         // -------------------------------------------------------------------------
         public create() {
-            this.stage.backgroundColor = 0xC0C0C0;
+            this.stage.backgroundColor = 0xA0DA6F;
 
             // camera
             this.camera.bounds = null;
 
             // physics
             this.physics.arcade.gravity.y = Generator.Parameters.GRAVITY;
+            // background
+            this._bg = new Background(this.game, this.world);
 
 
             //Generator.JumpTables.setDebug(true, ShadowySuperCoder.Global);
@@ -62,7 +66,8 @@ namespace ShadowySuperCoder {
         public update() {
             if (!this._gameOver) {
                 this.updatePhysics();
-
+                // move background
+                this._bg.updateLayers(this.camera.x);
                 // move camera
                 this.camera.x = this._player.x - 96;
 
