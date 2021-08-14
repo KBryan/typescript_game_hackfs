@@ -4,6 +4,7 @@
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/dungeons-and-dragons-nft" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/shadow_token/super_shadowy" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/shadowy_contract" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/super_shadow" vcs="Git" />
   </component>
 </project>
