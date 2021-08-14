@@ -6,5 +6,7 @@ namespace Generator {
         public offset = new Phaser.Point(0,0);
         // length in cell /tiles
         public length: number;
+        // bonus jump
+        public bonusJump:boolean;
     }
 }

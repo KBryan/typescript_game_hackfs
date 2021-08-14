@@ -40,6 +40,18 @@ namespace Generator {
         public static GENERATE_RANDOM = 50;
         // keep length of all platforms in pattern the same? (in percent)
         public static KEEP_LENGTH_IN_PATTERN = 75;
+        // bonus jump probability
+        public static  BONUS_JUMP_PROB_MIN = 0;
+        public static BONUS_JUMP_PROB_MAX = 30;
+        public static BONUS_JUMP_START_TITLE = 50;
+        public static BONUS_JUMP_END_TITLE = 200;
+        // bonus jump content
+        public static BONUS_JUMP_COUNT_MIN = 1;
+        public static BONUS_JUMP_COUNT_MAX = 3;
+        public static BONUS_JUMP_COUNT_START_TITLE = 50;
+        public static BONUS_JUMP_COUNT_END_TITLE = 300;
+
+
     }
 
 }

@@ -9,7 +9,10 @@ namespace ShadowySuperCoder {
         bodyHeight:number;
     }
 
+
     export class BlockDefs {
+        public static BONUS_JUMP: ITileDef = { name: "bonusJump", anchorX: 0.5, anchorY: 0.5, bodyOffsetX: 7, bodyOffsetY: 7, bodyWidth: 50, bodyHeight: 50 };
+
         public static PLATFORM:ITileDef[][] = [[
             { name: "PlatformLeft", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 48 },
             { name: "PlatformMiddle", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 48 },

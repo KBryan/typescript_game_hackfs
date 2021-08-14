@@ -47,6 +47,22 @@ var ShadowySuperCoder;
 })(ShadowySuperCoder || (ShadowySuperCoder = {}));
 var ShadowySuperCoder;
 (function (ShadowySuperCoder) {
+    var Animations = /** @class */ (function () {
+        function Animations() {
+        }
+        Animations.SPIKE_ANIM = ["Spikes1", "Spikes2", "Spikes3", "Spikes4", "Spikes3", "Spikes2"];
+        Animations.BONUS_JUMP_ANIM = [
+            "Bonus0", "Bonus1", "Bonus2", "Bonus3", "Bonus4",
+            "Bonus4", "Bonus4", "Bonus3", "Bonus2", "Bonus1",
+            "Bonus0", "Bonus5", "Bonus6", "Bonus7", "Bonus8",
+            "Bonus8", "Bonus8", "Bonus7", "Bonus6", "Bonus5"
+        ];
+        return Animations;
+    }());
+    ShadowySuperCoder.Animations = Animations;
+})(ShadowySuperCoder || (ShadowySuperCoder = {}));
+var ShadowySuperCoder;
+(function (ShadowySuperCoder) {
     var Background = /** @class */ (function (_super) {
         __extends(Background, _super);
         // -------------------------------------------------------------------------
@@ -123,6 +139,7 @@ var ShadowySuperCoder;
     var BlockDefs = /** @class */ (function () {
         function BlockDefs() {
         }
+        BlockDefs.BONUS_JUMP = { name: "bonusJump", anchorX: 0.5, anchorY: 0.5, bodyOffsetX: 7, bodyOffsetY: 7, bodyWidth: 50, bodyHeight: 50 };
         BlockDefs.PLATFORM = [[
                 { name: "PlatformLeft", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 48 },
                 { name: "PlatformMiddle", anchorX: 0, anchorY: 0.2, bodyOffsetX: 0, bodyOffsetY: 16, bodyWidth: 64, bodyHeight: 48 },
@@ -184,7 +201,6 @@ var ShadowySuperCoder;
             // walls group
             _this._walls = new Phaser.Group(game, _this);
             // set initial tile for generating
-            // this._piece = this._generator.setPiece(0, 5, 10);
             _this._generator.setPiece(0, 5, 10);
             _this._state = 0 /* PROCESS_PIECE */;
             return _this;
@@ -374,7 +390,54 @@ var ShadowySuperCoder;
             // set body size and offset
             body.setSize(bodyW, bodyH, bodyOffsetX, bodyOffsetY);
             return _this;
+            // create Spriter loader - class that can change Spriter file into internal structure
+            /*  let spriterLoader = new Spriter.Loader();
+  
+              // create Spriter file object - it wraps XML/JSON loaded with Phaser Loader
+              let spriterFile = new Spriter.SpriterXml(game.cache.getXML("PlayerAnim"));
+  
+              // proces Spriter file (XML/JSON) with Spriter loader - outputs Spriter animation which you can instantiate multiple times with SpriterGroup
+              let spriterData = spriterLoader.load(spriterFile);
+  
+              // create actual renderable object - it is extension of Phaser.Group
+              this._spriterGroup = new Spriter.SpriterGroup(this.game, spriterData, "Sprites", "Goblin", "fall", 120);
+  
+              // set position size
+              this._spriterGroup.position.set(-5, 60);
+  
+              // adds SpriterGroup to Phaser.World to appear on screen
+              this.addChild(this._spriterGroup);*/
         }
+        // -------------------------------------------------------------------------
+        Player.prototype.animateJump = function () {
+            this._spriterGroup.playAnimationByName("jump");
+        };
+        // -------------------------------------------------------------------------
+        Player.prototype.animateDeath = function () {
+            var body = this.body;
+            body.enable = false;
+            this._spriterGroup.playAnimationByName("fall_water");
+        };
+        // -------------------------------------------------------------------------
+        Player.prototype.animateHit = function () {
+            this._spriterGroup.playAnimationByName("hit");
+        };
+        // -------------------------------------------------------------------------
+        Player.prototype.updateAnim = function (standing, velY, gameOver) {
+            if (!gameOver) {
+                if (standing) {
+                    if (this._spriterGroup.currentAnimationName !== "run") {
+                        this._spriterGroup.playAnimationByName("run");
+                    }
+                }
+                else if (velY > 0) {
+                    if (this._spriterGroup.currentAnimationName !== "fall") {
+                        this._spriterGroup.playAnimationByName("fall");
+                    }
+                }
+            }
+            this._spriterGroup.updateAnimation();
+        };
         return Player;
     }(Phaser.Sprite));
     ShadowySuperCoder.Player = Player;
@@ -391,6 +454,10 @@ var Generator;
         // -------------------------------------------------------------------------
         function Difficulty(rnd) {
             this._rnd = rnd;
+            //initial bonus jump probability
+            this._bonusJumpProbability = Generator.Parameters.BONUS_JUMP_PROB_MIN;
+            // initial bonus jump count
+            this._bonusJumpCount = Generator.Parameters.BONUS_JUMP_COUNT_MIN;
             // maximum length of platform
             this._platformLengthDecrease = Generator.Parameters.PLATFORM_LENGTH_DECREASER_MIN;
             // jump width decreaser to make jumps easier in game beginnig
@@ -412,6 +479,21 @@ var Generator;
             enumerable: false,
             configurable: true
         });
+        Object.defineProperty(Difficulty.prototype, "bonusJumpProbability", {
+            get: function () {
+                return this._bonusJumpProbability;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(Difficulty.prototype, "bonusJumpCount", {
+            // -------------------------------------------------------------------------
+            get: function () {
+                return this._bonusJumpCount;
+            },
+            enumerable: false,
+            configurable: true
+        });
         // -------------------------------------------------------------------------
         Difficulty.prototype.mapLinear = function (x, a1, a2, b1, b2) {
             x = Phaser.Math.clamp(x, a1, a2);
@@ -423,11 +505,17 @@ var Generator;
             this._platformLengthDecrease = Math.round(this.mapLinear(tileX, Generator.Parameters.PLATFORM_LENGTH_DECREASER_START_TITLE, Generator.Parameters.PLATFORM_LENGTH_DECREASER_END_TITLE, Generator.Parameters.PLATFORM_LENGTH_DECREASER_MIN, Generator.Parameters.PLATFORM_LENGTH_DECREASER_MAX));
             // jump length
             this._jumpLengthDecrease = Math.round(this.mapLinear(tileX, Generator.Parameters.JUMP_LENGTH_DECREASER_MAX_START_TITLE, Generator.Parameters.JUMP_LENGTH_DECREASER_END_TITLE, Generator.Parameters.JUMP_LENGTH_DECREASER_MIN, Generator.Parameters.JUMP_LENGTH_DECREASER_MAX));
+            // bonus jump probability
+            this._bonusJumpProbability = Math.round(this.mapLinear(tileX, Generator.Parameters.BONUS_JUMP_START_TITLE, Generator.Parameters.BONUS_JUMP_END_TITLE, Generator.Parameters.BONUS_JUMP_PROB_MIN, Generator.Parameters.BONUS_JUMP_PROB_MAX));
+            // bonus jump count
+            this._bonusJumpCount = Math.round(this.mapLinear(tileX, Generator.Parameters.BONUS_JUMP_COUNT_START_TITLE, Generator.Parameters.BONUS_JUMP_COUNT_START_TITLE, Generator.Parameters.BONUS_JUMP_COUNT_MIN, Generator.Parameters.BONUS_JUMP_COUNT_MAX));
         };
         // -------------------------------------------------------------------------
         Difficulty.prototype.toString = function () {
             return "platformLengthDecrease: " + this._platformLengthDecrease +
-                ", jumpLengthDecrease: " + this.jumpLengthDecrease;
+                ", jumpLengthDecrease: " + this.jumpLengthDecrease +
+                ", bonusJumpProbability: " + this._bonusJumpProbability +
+                ", bonusJumpCount: " + this._bonusJumpCount;
         };
         return Difficulty;
     }());
@@ -435,24 +523,14 @@ var Generator;
 })(Generator || (Generator = {}));
 var Generator;
 (function (Generator_1) {
-    /**
-     * // TODO: comment Generator
-     * Gets script version
-     * @param fileName
-     * @returns script version
-     */
     var UNDEFINED = -10000;
     var Generator = /** @class */ (function () {
-        /**
-         * // TODO: comment Generator
-         * Gets script version
-         * @param fileName
-         * @returns script version
-         */
+        // -------------------------------------------------------------------------
         function Generator(rnd) {
-            // signale
+            // signals
             // dispatch new piece, previous piece
             this.onRandomPlatform = new Phaser.Signal();
+            // dispatch new piece, previous piece, position in pattern, repeat order, pattern base piece
             this.onPatternPlatform = new Phaser.Signal();
             this._lastGeneratedPiece = null;
             // pieces queue
@@ -574,7 +652,22 @@ var Generator;
                 // decrease maximum length of platform with difficulty progress
                 piece.length = this._rnd.integerInRange(Generator_1.Parameters.PLATFORM_LENGTH_MIN, Generator_1.Parameters.PLATFORM_LENGTH_MAX + difficulty.platformLengthDecrease);
             }
-            console.log(difficulty.toString());
+            // SPIKES
+            // if (this._lastGeneratedPiece !== null && this._lastGeneratedPiece.spikesPattern === 0 &&
+            //     !bonusJump &&
+            //     (this._rnd.integerInRange(0, 99) < difficulty.spikesProbability)) {
+            //
+            //     // adjust length - make piece longer
+            //     piece.length = this._rnd.integerInRange(5, 9);
+            //
+            //     // choose spikes pattern randomly
+            //     let patternDefs = Parameters.SPIKE_PATTERNS[piece.length];
+            //     piece.spikesPattern = patternDefs[this._rnd.integerInRange(0, patternDefs.length - 1)];
+            //
+            // } else {
+            //     piece.spikesPattern = 0;
+            // }
+            // console.log(difficulty.toString());
             // RESULT
             this._lastGeneratedPiece = piece;
             return piece;
@@ -595,7 +688,8 @@ var Generator;
             var piece = this.generate(lastTile, difficulty, UNDEFINED, UNDEFINED, UNDEFINED, false);
             // add to queue
             this.addPieceIntoQueue(piece);
-            // dispatch signal - let listener know if random platform has been generated
+            // dispatch signal - let listeners know, random platform has been generated
+            // pass: new piece, previous piece
             this.onRandomPlatform.dispatch(piece, prevPiece);
         };
         // -------------------------------------------------------------------------
@@ -621,15 +715,15 @@ var Generator;
                 // add to queue
                 this.addPieceIntoQueue(piece);
                 // dispatch signal - let listeners know, pattern platform has been generated
-                // pass: new piece, previous piece
+                // pass: new piece, previous piece, position in pattern, repeat order, pattern base piece
                 this.onPatternPlatform.dispatch(piece, prevPiece, i, 0, null);
             }
             // repeat pattern X times
             var repeat = 1;
             for (var i = 0; i < repeat; i++) {
-                var prevPiece = this._lastGeneratedPiece;
                 // repeat all pieces in pattern
                 for (var p = 0; p < basePices; p++) {
+                    var prevPiece = this._lastGeneratedPiece;
                     // get first piece in pattern to repeat as template
                     var templetePiece = this._piecesQueue[oldQueueTop + p];
                     // replicate it
@@ -638,7 +732,8 @@ var Generator;
                     hlpPos.x += piece.length - 1;
                     // add to stack
                     this.addPieceIntoQueue(piece);
-                    // dispatch signal - let listneners know, pattern platform has been generated
+                    // dispatch signal - let listeners know, pattern platform has been generated
+                    // pass: new piece, previous piece, position in pattern, repeat order, pattern base piece
                     this.onPatternPlatform.dispatch(piece, prevPiece, p, i + 1, templetePiece);
                 }
             }
@@ -988,6 +1083,16 @@ var Generator;
         Parameters.GENERATE_RANDOM = 50;
         // keep length of all platforms in pattern the same? (in percent)
         Parameters.KEEP_LENGTH_IN_PATTERN = 75;
+        // bonus jump probability
+        Parameters.BONUS_JUMP_PROB_MIN = 0;
+        Parameters.BONUS_JUMP_PROB_MAX = 30;
+        Parameters.BONUS_JUMP_START_TITLE = 50;
+        Parameters.BONUS_JUMP_END_TITLE = 200;
+        // bonus jump content
+        Parameters.BONUS_JUMP_COUNT_MIN = 1;
+        Parameters.BONUS_JUMP_COUNT_MAX = 3;
+        Parameters.BONUS_JUMP_COUNT_START_TITLE = 50;
+        Parameters.BONUS_JUMP_COUNT_END_TITLE = 300;
         return Parameters;
     }());
     Generator.Parameters = Parameters;

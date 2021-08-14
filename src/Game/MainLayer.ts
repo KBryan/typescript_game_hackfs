@@ -46,6 +46,7 @@ namespace ShadowySuperCoder {
             this._generator.onRandomPlatform.add(this.onRandomPlatform, this);
             this._generator.onPatternPlatform.add(this.onPatternPlatform, this);
 
+
             // object that holds level difficulty progress
             this._difficulty = new Generator.Difficulty(game.rnd);
 
@@ -70,7 +71,6 @@ namespace ShadowySuperCoder {
             this._walls = new Phaser.Group(game, this);
 
             // set initial tile for generating
-            // this._piece = this._generator.setPiece(0, 5, 10);
             this._generator.setPiece(0, 5, 10);
             this._state = eGenerateState.PROCESS_PIECE;
         }
@@ -119,7 +119,6 @@ namespace ShadowySuperCoder {
                         if (!this._generator.hasPieces) {
                             this._state = eGenerateState.GENERATE_PIECE;
                         }
-
                         break;
                     }
 

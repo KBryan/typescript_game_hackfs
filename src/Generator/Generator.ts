@@ -1,17 +1,15 @@
 namespace Generator {
-    /**
-     * // TODO: comment Generator
-     * Gets script version
-     * @param fileName
-     * @returns script version
-     */
+
     const UNDEFINED = -10000;
 
     export class Generator {
-        // signale
+
+        // signals
         // dispatch new piece, previous piece
-        public onRandomPlatform:Phaser.Signal = new Phaser.Signal();
-        public onPatternPlatform:Phaser.Signal = new Phaser.Signal();
+        public onRandomPlatform: Phaser.Signal = new Phaser.Signal();
+        // dispatch new piece, previous piece, position in pattern, repeat order, pattern base piece
+        public onPatternPlatform: Phaser.Signal = new Phaser.Signal();
+
 
         private _rnd: Phaser.RandomDataGenerator;
         private _jumpTables: JumpTables;
@@ -25,12 +23,7 @@ namespace Generator {
         private _piecesQueueTop: number = 0;
         private _hlpPoint: Phaser.Point = new Phaser.Point();
 
-        /**
-         * // TODO: comment Generator
-         * Gets script version
-         * @param fileName
-         * @returns script version
-         */
+        // -------------------------------------------------------------------------
         public constructor(rnd: Phaser.RandomDataGenerator) {
             // random numbers generator
             this._rnd = rnd;
@@ -177,7 +170,24 @@ namespace Generator {
             }
 
 
-            console.log(difficulty.toString());
+            // SPIKES
+            // if (this._lastGeneratedPiece !== null && this._lastGeneratedPiece.spikesPattern === 0 &&
+            //     !bonusJump &&
+            //     (this._rnd.integerInRange(0, 99) < difficulty.spikesProbability)) {
+            //
+            //     // adjust length - make piece longer
+            //     piece.length = this._rnd.integerInRange(5, 9);
+            //
+            //     // choose spikes pattern randomly
+            //     let patternDefs = Parameters.SPIKE_PATTERNS[piece.length];
+            //     piece.spikesPattern = patternDefs[this._rnd.integerInRange(0, patternDefs.length - 1)];
+            //
+            // } else {
+            //     piece.spikesPattern = 0;
+            // }
+
+
+            // console.log(difficulty.toString());
 
 
             // RESULT
@@ -203,8 +213,10 @@ namespace Generator {
 
             // add to queue
             this.addPieceIntoQueue(piece);
-            // dispatch signal - let listener know if random platform has been generated
-            this.onRandomPlatform.dispatch(piece,prevPiece);
+
+            // dispatch signal - let listeners know, random platform has been generated
+            // pass: new piece, previous piece
+            this.onRandomPlatform.dispatch(piece, prevPiece);
         }
 
         // -------------------------------------------------------------------------
@@ -237,9 +249,10 @@ namespace Generator {
 
                 // add to queue
                 this.addPieceIntoQueue(piece);
+
                 // dispatch signal - let listeners know, pattern platform has been generated
-                // pass: new piece, previous piece
-                this.onPatternPlatform.dispatch(piece,prevPiece,i,0,null);
+                // pass: new piece, previous piece, position in pattern, repeat order, pattern base piece
+                this.onPatternPlatform.dispatch(piece, prevPiece, i, 0, null);
             }
 
 
@@ -247,9 +260,10 @@ namespace Generator {
             let repeat = 1;
 
             for (let i = 0; i < repeat; i++) {
-                let prevPiece = this._lastGeneratedPiece;
+
                 // repeat all pieces in pattern
                 for (let p = 0; p < basePices; p++) {
+                    let prevPiece = this._lastGeneratedPiece;
                     // get first piece in pattern to repeat as template
                     let templetePiece = this._piecesQueue[oldQueueTop + p];
 
@@ -262,8 +276,10 @@ namespace Generator {
 
                     // add to stack
                     this.addPieceIntoQueue(piece);
-                    // dispatch signal - let listneners know, pattern platform has been generated
-                    this.onPatternPlatform.dispatch(piece,prevPiece,p,i + 1, templetePiece);
+
+                    // dispatch signal - let listeners know, pattern platform has been generated
+                    // pass: new piece, previous piece, position in pattern, repeat order, pattern base piece
+                    this.onPatternPlatform.dispatch(piece, prevPiece, p, i + 1, templetePiece);
                 }
             }
         }
